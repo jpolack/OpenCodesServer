@@ -68,7 +68,13 @@ func (h *httpHandler) newCapsuleHandler(w http.ResponseWriter, r *http.Request) 
 
 	h.iotaConnector.newCapsule(encryptedMessage, string(address))
 
-	bytes, err := json.Marshal(inputCapsule)
+	var response struct {
+		Link string `json:"link"`
+	}
+
+	response.Link = "http://localhost:3000/capsule/" + string(address)
+
+	bytes, err := json.Marshal(response)
 	if err != nil {
 		log.Fatalln("Error stringifing JSON", err)
 		w.Write([]byte("Error"))
