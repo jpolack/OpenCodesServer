@@ -1,8 +1,10 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	gmam "github.com/habpygo/mam.client.go"
 )
@@ -18,17 +20,27 @@ func initConnector() connector {
 	return connector{c}
 }
 
+type safeCapsule struct {
+	Data        string    `json:"data"`
+	OpeningDate time.Time `json:"openingDate"`
+}
+
 type connector struct {
 	conn *gmam.Connection
 }
 
-func (c *connector) newCapsule(message, address string) {
+func (c *connector) newCapsule(message, address string, openingDate time.Time) {
 	if c.conn == nil {
 		log.Fatalln("Connection is required")
 		return
 	}
 
-	_, err := gmam.Send(address, 0, message, c.conn)
+	bytes, err := json.Marshal(safeCapsule{message, openingDate})
+	if err != nil {
+		log.Fatalln("Could marshal capsule", message, openingDate, err)
+	}
+
+	_, err = gmam.Send(address, 0, string(bytes), c.conn)
 	if err != nil {
 		log.Fatalln("Could not send capsule", message, err)
 	}

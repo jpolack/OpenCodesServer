@@ -66,7 +66,7 @@ func (h *httpHandler) newCapsuleHandler(w http.ResponseWriter, r *http.Request) 
 		log.Fatalln("Could not encrypt capsule", inputCapsule, err)
 	}
 
-	h.iotaConnector.newCapsule(encryptedMessage, string(address))
+	h.iotaConnector.newCapsule(encryptedMessage, string(address), inputCapsule.OpeningDate)
 
 	var response struct {
 		Link string `json:"link"`
