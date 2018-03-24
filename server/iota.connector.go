@@ -7,12 +7,18 @@ import (
 	"time"
 
 	gmam "github.com/habpygo/mam.client.go"
+	"github.com/iotaledger/giota"
 )
 
 const SEED = "ENBRKGYXMKWNSNECKCBYJWODEEBHPCCYMRURXOVOMZVB99HNNCYMUXRDEDKHCPZRFBNYPQIDAPCEAHOQW"
 
+type iotaConnector interface {
+	SendToApi([]giota.Transfer) (giota.Bundle, error)
+}
+
 func initConnector() connector {
-	c, err := gmam.NewConnection("http://node.lukaseder.de:14265", SEED)
+	c, err := gmam.NewFakeConnection("http://node.lukaseder.de:14265", SEED)
+	// c, err := gmam.NewConnection("http://node.lukaseder.de:14265", SEED)
 	if err != nil {
 		log.Fatalln("Error building connection", err)
 		return connector{}
@@ -26,7 +32,7 @@ type safeCapsule struct {
 }
 
 type connector struct {
-	conn *gmam.Connection
+	conn iotaConnector
 }
 
 func (c *connector) newCapsule(message, address string, openingDate time.Time) {
