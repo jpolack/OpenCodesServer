@@ -6,7 +6,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"io"
+	"strings"
 )
+
+func key(i string) []byte {
+	return []byte(i + strings.Repeat("0", 32-len(i)))
+}
 
 func encrypt(key []byte, message string) (encmess string, err error) {
 	plainText := []byte(message)

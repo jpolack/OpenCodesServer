@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -19,9 +18,7 @@ func Start() {
 	fmt.Println("Connected")
 
 	cors := cors.New(cors.Options{
-		// AllowedOrigins: []string{"https://foo.com"}, // Use this to allow specific origin hosts
-		AllowedOrigins: []string{"*"},
-		// AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
+		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -32,6 +29,7 @@ func Start() {
 	r := chi.NewRouter()
 	r.Use(cors.Handler)
 	r.Post("/new", handler.newCapsuleHandler)
+	r.Post("/capsule/{id}", handler.readCapsuleHandler)
 	fmt.Println("Listening on Port :8000")
 	http.ListenAndServe(":8000", r)
 }
@@ -60,7 +58,7 @@ func (h *httpHandler) newCapsuleHandler(w http.ResponseWriter, r *http.Request) 
 		w.Write([]byte("Error"))
 		return
 	}
-	log.Printf("Create new Capsule for: %+v\n", inputCapsule)
+	log.Printf("Create new Capsule\n")
 
 	seed := giota.NewSeed()
 	address, err := giota.NewAddress(seed, 0, 3)
@@ -75,8 +73,8 @@ func (h *httpHandler) newCapsuleHandler(w http.ResponseWriter, r *http.Request) 
 		log.Fatalln("Could not marshal capsule", inputCapsule, err)
 	}
 
-	inputCapsule.Password = inputCapsule.Password + strings.Repeat("0", 32-len(inputCapsule.Password))
-	encryptedMessage, err := encrypt([]byte(inputCapsule.Password), string(message))
+	pw := key(inputCapsule.Password)
+	encryptedMessage, err := encrypt(pw, string(message))
 	if err != nil {
 		log.Fatalln("Could not encrypt capsule", inputCapsule, err)
 	}
@@ -98,4 +96,37 @@ func (h *httpHandler) newCapsuleHandler(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Add("Content-Type", "application/json")
 	w.Write(bytes)
+}
+
+func (h *httpHandler) readCapsuleHandler(w http.ResponseWriter, r *http.Request) {
+
+	id := chi.URLParam(r, "id")
+
+	readCapsule, err := h.iotaConnector.readCapsule(id)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Ungültige Zeitkapsel"))
+		return
+	}
+
+	var request struct {
+		Password string `json:"password"`
+	}
+	err = json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		log.Fatalln("Error parsing JSON", err)
+		w.Write([]byte("Error"))
+		return
+	}
+
+	decrypted, err := decrypt(key(request.Password), readCapsule.meta.Data)
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Ungültiges Passwort"))
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	w.Write([]byte(decrypted))
 }
