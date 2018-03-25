@@ -94,8 +94,14 @@ func (h *httpHandler) newCapsuleHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 type feed struct {
-	Meta     capsule  `json:"capsule"`
-	Memories []memory `json:"memories"`
+	Meta        capsule               `json:"capsule"`
+	OpeningDate time.Time             `json:"openingDate"`
+	Memories    []memoryWithTimestamp `json:"memories"`
+}
+
+type memoryWithTimestamp struct {
+	memory
+	CreationDate time.Time `json:"creationDate"`
 }
 
 func (h *httpHandler) readCapsuleHandler(w http.ResponseWriter, r *http.Request) {
@@ -129,6 +135,7 @@ func (h *httpHandler) readCapsuleHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	response.Memories = readCapsule.memories
+	response.OpeningDate = readCapsule.meta.OpeningDate
 
 	bytes, err := json.Marshal(response)
 	if err != nil {

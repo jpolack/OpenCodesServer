@@ -61,7 +61,7 @@ func (c *connector) newCapsule(message, address string, openingDate time.Time) {
 
 type readCapsule struct {
 	meta     saveCapsule
-	memories []memory
+	memories []memoryWithTimestamp
 }
 
 func (c *connector) readCapsule(address string) (readCapsule, error) {
@@ -107,7 +107,7 @@ func (c *connector) readCapsule(address string) (readCapsule, error) {
 	}
 
 	restEncoded := ts[1:]
-	memories := []memory{}
+	memories := []memoryWithTimestamp{}
 
 	for _, m := range restEncoded {
 		memoryString, err := mamutils.FromMAMTrytes(m.SignatureMessageFragment)
@@ -116,7 +116,7 @@ func (c *connector) readCapsule(address string) (readCapsule, error) {
 			continue
 		}
 
-		memo := memory{}
+		memo := memoryWithTimestamp{}
 		err = json.Unmarshal([]byte(memoryString), &memo)
 
 		if err != nil {
@@ -124,6 +124,7 @@ func (c *connector) readCapsule(address string) (readCapsule, error) {
 			continue
 		}
 
+		memo.CreationDate = m.Timestamp
 		memories = append(memories, memo)
 	}
 
