@@ -80,7 +80,7 @@ func (h *httpHandler) newCapsuleHandler(w http.ResponseWriter, r *http.Request) 
 		Link string `json:"link"`
 	}
 
-	response.Link = "http://localhost:3000/capsule/" + string(address)
+	response.Link = string(address)
 
 	bytes, err := json.Marshal(response)
 	if err != nil {
@@ -96,6 +96,7 @@ func (h *httpHandler) newCapsuleHandler(w http.ResponseWriter, r *http.Request) 
 type feed struct {
 	Meta        capsule               `json:"capsule"`
 	OpeningDate time.Time             `json:"openingDate"`
+	MemoryCount int                   `json:"memoryCount"`
 	Memories    []memoryWithTimestamp `json:"memories"`
 }
 
@@ -134,8 +135,11 @@ func (h *httpHandler) readCapsuleHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	response.Memories = readCapsule.memories
 	response.OpeningDate = readCapsule.meta.OpeningDate
+	response.MemoryCount = len(readCapsule.memories)
+	if time.Now().UnixNano() >= response.OpeningDate.UnixNano() {
+		response.Memories = readCapsule.memories
+	}
 
 	bytes, err := json.Marshal(response)
 	if err != nil {
