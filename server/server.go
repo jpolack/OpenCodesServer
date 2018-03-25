@@ -98,6 +98,10 @@ func (h *httpHandler) newCapsuleHandler(w http.ResponseWriter, r *http.Request) 
 	w.Write(bytes)
 }
 
+type feed struct {
+	Meta capsule `json:"capsule"`
+}
+
 func (h *httpHandler) readCapsuleHandler(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "id")
@@ -127,6 +131,22 @@ func (h *httpHandler) readCapsuleHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	response := feed{}
+
+	err = json.Unmarshal([]byte(decrypted), &response.Meta)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Ungültiges Passwort"))
+		return
+	}
+
+	bytes, err := json.Marshal(response)
+	if err != nil {
+		log.Fatalln("Error stringifing JSON", err)
+		w.Write([]byte("Error"))
+		return
+	}
+
 	w.Header().Add("Content-Type", "application/json")
-	w.Write([]byte(decrypted))
+	w.Write(bytes)
 }
