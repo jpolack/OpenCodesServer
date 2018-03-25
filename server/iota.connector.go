@@ -82,6 +82,10 @@ func (c *connector) readCapsule(address string) (readCapsule, error) {
 		return ts[i].Timestamp.UnixNano() < ts[j].Timestamp.UnixNano()
 	})
 
+	if len(ts) == 0 {
+		return readCapsule{}, errors.New("Address not found")
+	}
+
 	metaEncoded := ts[0]
 	// rest := ts[1:]
 
