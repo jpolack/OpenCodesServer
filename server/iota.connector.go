@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"sort"
 	"time"
@@ -57,14 +56,20 @@ func (c *connector) newCapsule(message, address string, openingDate time.Time) {
 		return
 	}
 
-	fmt.Printf("Sent Transaction to: %v\n", address)
+	log.Printf("Created new capsule: %v\n", address)
 }
 
 type readCapsule struct {
-	meta saveCapsule
+	meta     saveCapsule
+	memories []memory
 }
 
 func (c *connector) readCapsule(address string) (readCapsule, error) {
+	if c.conn == nil {
+		log.Fatalln("Connection is required")
+		return readCapsule{}, nil
+	}
+
 	iotaAdress, err := giota.ToAddress(address)
 	if err != nil {
 		return readCapsule{}, errors.New("Invalid Address")
@@ -87,8 +92,6 @@ func (c *connector) readCapsule(address string) (readCapsule, error) {
 	}
 
 	metaEncoded := ts[0]
-	// rest := ts[1:]
-
 	metaString, err := mamutils.FromMAMTrytes(metaEncoded.SignatureMessageFragment)
 	if err != nil {
 		log.Fatalln("Could parse trytes", err)
@@ -103,5 +106,47 @@ func (c *connector) readCapsule(address string) (readCapsule, error) {
 		return readCapsule{}, errors.New("Internal Error")
 	}
 
-	return readCapsule{meta}, nil
+	restEncoded := ts[1:]
+	memories := []memory{}
+
+	for _, m := range restEncoded {
+		memoryString, err := mamutils.FromMAMTrytes(m.SignatureMessageFragment)
+		if err != nil {
+			log.Fatalln("Could parse trytes", err)
+			continue
+		}
+
+		memo := memory{}
+		err = json.Unmarshal([]byte(memoryString), &memo)
+
+		if err != nil {
+			log.Fatalln("Could not unmarshal", err)
+			continue
+		}
+
+		memories = append(memories, memo)
+	}
+
+	return readCapsule{meta, memories}, nil
+}
+
+func (c *connector) writeToCapsule(message memory, address string) {
+	if c.conn == nil {
+		log.Fatalln("Connection is required")
+		return
+	}
+
+	bytes, err := json.Marshal(message)
+	if err != nil {
+		log.Fatalln("Could marshal message", message, err)
+		return
+	}
+
+	_, err = gmam.Send(address, 0, string(bytes), c.conn)
+	if err != nil {
+		log.Fatalln("Could not send message", message, err)
+		return
+	}
+
+	log.Printf("Sent memory to: %v\n", address)
 }

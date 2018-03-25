@@ -30,6 +30,7 @@ func Start() {
 	r.Use(cors.Handler)
 	r.Post("/new", handler.newCapsuleHandler)
 	r.Post("/capsule/{id}", handler.readCapsuleHandler)
+	r.Put("/capsule/{id}", handler.writeCapsuleHandler)
 	fmt.Println("Listening on Port :8000")
 	http.ListenAndServe(":8000", r)
 }
@@ -73,13 +74,7 @@ func (h *httpHandler) newCapsuleHandler(w http.ResponseWriter, r *http.Request) 
 		log.Fatalln("Could not marshal capsule", inputCapsule, err)
 	}
 
-	pw := key(inputCapsule.Password)
-	encryptedMessage, err := encrypt(pw, string(message))
-	if err != nil {
-		log.Fatalln("Could not encrypt capsule", inputCapsule, err)
-	}
-
-	h.iotaConnector.newCapsule(encryptedMessage, string(address), inputCapsule.OpeningDate)
+	h.iotaConnector.newCapsule(string(message), string(address), inputCapsule.OpeningDate)
 
 	var response struct {
 		Link string `json:"link"`
@@ -99,7 +94,8 @@ func (h *httpHandler) newCapsuleHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 type feed struct {
-	Meta capsule `json:"capsule"`
+	Meta     capsule  `json:"capsule"`
+	Memories []memory `json:"memories"`
 }
 
 func (h *httpHandler) readCapsuleHandler(w http.ResponseWriter, r *http.Request) {
@@ -123,22 +119,16 @@ func (h *httpHandler) readCapsuleHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	decrypted, err := decrypt(key(request.Password), readCapsule.meta.Data)
-
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Ungültiges Passwort"))
-		return
-	}
-
 	response := feed{}
 
-	err = json.Unmarshal([]byte(decrypted), &response.Meta)
+	err = json.Unmarshal([]byte(readCapsule.meta.Data), &response.Meta)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Ungültiges Passwort"))
 		return
 	}
+
+	response.Memories = readCapsule.memories
 
 	bytes, err := json.Marshal(response)
 	if err != nil {
@@ -149,4 +139,46 @@ func (h *httpHandler) readCapsuleHandler(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Add("Content-Type", "application/json")
 	w.Write(bytes)
+}
+
+type memory struct {
+	Name    string `json:"name"`
+	Title   string `json:"title"`
+	Message string `json:"message"`
+}
+
+func (h *httpHandler) writeCapsuleHandler(w http.ResponseWriter, r *http.Request) {
+
+	id := chi.URLParam(r, "id")
+
+	readCapsule, err := h.iotaConnector.readCapsule(id)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Ungültige Zeitkapsel"))
+		return
+	}
+
+	var request struct {
+		Memory   memory `json:"memory"`
+		Password string `json:"password"`
+	}
+	err = json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		log.Fatalln("Error parsing JSON", err)
+		w.Write([]byte("Error"))
+		return
+	}
+
+	response := feed{}
+
+	err = json.Unmarshal([]byte(readCapsule.meta.Data), &response.Meta)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Ungültiges Passwort"))
+		return
+	}
+
+	h.iotaConnector.writeToCapsule(request.Memory, id)
+
+	w.Write([]byte("OK"))
 }
